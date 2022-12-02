@@ -1,0 +1,81 @@
+#include <UbiConstants.h>
+#include <UbidotsEsp32Mqtt.h>
+#include <UbiTypes.h>
+
+/**************
+* Include Libraries
+**************/
+
+#include "DHTesp.h"
+
+
+const int DHT_PIN = 15;
+const int sensorPin = 36;
+const int bomba = 33;
+
+DHTesp dhtSensor;
+/**************
+* Define Instances and Constants
+**************/   
+const char* UBIDOTS_TOKEN = "BBFF-Fj66H3vTC0RvVdjtXjHgYtLom4c5iX";  // Put here your Ubidots TOKEN
+/*const char* UBIDOTS_TOKEN = "BBFF-y0lKCfl5iW4YfMH5m9lwRW9JtDlH8c";  // Put here your Ubidots TOKEN*/
+/**************
+ * Define Constants
+ **************/
+Ubidots ubidots(UBIDOTS_TOKEN);
+/***************/
+
+/*const int humedad = A0; //mido la humedad al analogico 0*/
+int contador = 0;
+
+void setup() {
+  pinMode(sensorPin, INPUT);//Configuro humedad como entrada,(humedad del suelo)
+  pinMode(bomba, OUTPUT);//Configuro bomba como salida
+  Serial.begin(115200);
+  /*servo.attach(5);   // Servo -> Bomba
+  pinMode(humedad, INPUT); // Humedad*/
+    dhtSensor.setup(DHT_PIN, DHTesp::DHT11);
+  ubidots.connectToWifi("LabArquitectura", "L4bArqui2022");
+  /*Se incluye las funciones de Setup y Reconnect, predefinidas de la librería*/
+  ubidots.setup();
+  ubidots.reconnect();}
+
+void loop() {
+  if (!ubidots.connected())
+  {
+    ubidots.reconnect();
+  }
+  int humedad = analogRead(sensorPin);
+  TempAndHumidity  data = dhtSensor.getTempAndHumidity();
+  Serial.println("Temp: " + String(data.temperature, 2) + "°C");
+  Serial.println("Humidity: " + String(data.humidity, 1) + "%");
+  Serial.println("---");
+
+  if(humedad >= 3000) // el valor que considero seco y hay que regar es de 700*4 (la resolución del convertidor es en 12 bits) 
+  {
+   // Si la tierra está seca, comenzara a regar
+   // Riega durante 1 segundo y espera a comprobar la humedad otro segundo
+   Serial.println("La tierra está seca, comienza el riego");
+   digitalWrite(bomba, LOW);
+   delay(2000);
+  }
+  else{
+    digitalWrite(bomba, HIGH);
+   delay(1000);
+  }
+
+  
+  //Si la tierra no está seca, no riega y da el valor de la humedad
+  delay(1000);
+
+  /* Obtain last value from a variable as float using HTTP */
+  /*float value = ubidots.get("40f5202386d7", "servo");*/
+  ubidots.add("tempetatura", data.temperature);
+  ubidots.add("humedad", data.humidity);
+  ubidots.add("humedad-del-suelo", humedad);
+  ubidots.publish("agricultura-de-precision");
+  delay(3000);
+  ubidots.loop();
+
+  
+}
